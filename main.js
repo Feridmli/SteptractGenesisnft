@@ -17,11 +17,6 @@ const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xf62049dd99d
 const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395";
 const APECHAIN_RPC = import.meta.env.VITE_APECHAIN_RPC || "https://rpc.apechain.com";
 
-// Konsolda yoxlanış (Debug üçün vacibdir)
-if (!BACKEND_URL || !NFT_CONTRACT_ADDRESS || !SEAPORT_ADDRESS) {
-    console.error("⚠️ DİQQƏT: .env faylında bəzi dəyərlər əksikdir (VITE_BACKEND_URL, VITE_NFT_CONTRACT_ADDRESS, VITE_SEAPORT_ADDRESS).");
-}
-
 const ZERO_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -194,7 +189,7 @@ disconnectBtn.onclick = handleDisconnect;
 connectBtn.onclick = connectWallet;
 
 // ==========================================
-// DATA YÜKLƏMƏ
+// DATA YÜKLƏMƏ VƏ SORTING (YENİLƏNDİ)
 // ==========================================
 
 async function fetchStats() {
@@ -219,7 +214,33 @@ async function loadNFTs() {
   try {
     const res = await fetch(`${BACKEND_URL}/api/nfts`);
     const data = await res.json();
-    allNFTs = data.nfts || [];
+    let rawList = data.nfts || [];
+
+    // ========================================================
+    // YENİ SORTING MƏNTİQİ: 
+    // 1. Listələnənlər (Price > 0) -> ƏN BAŞA
+    // 2. Listələnənlər öz aralarında -> UCUZDAN BAHAYA
+    // 3. Listələnməyənlər -> TOKEN ID ARDICILLIĞI İLƏ
+    // ========================================================
+    allNFTs = rawList.sort((a, b) => {
+        const priceA = parseFloat(a.price) || 0;
+        const priceB = parseFloat(b.price) || 0;
+        const idA = parseInt(a.tokenid);
+        const idB = parseInt(b.tokenid);
+
+        // 1. Şərt: Listələnənlər önə keçsin
+        if (priceA > 0 && priceB === 0) return -1; // A önə
+        if (priceA === 0 && priceB > 0) return 1;  // B önə
+
+        // 2. Şərt: Hər ikisi listələnibsə, qiymətə görə düz (Artan)
+        if (priceA > 0 && priceB > 0) {
+            return priceA - priceB;
+        }
+
+        // 3. Şərt: Hər ikisi listələnməyibsə, Token ID-yə görə düz
+        return idA - idB;
+    });
+
     renderNFTs(allNFTs);
   } catch (err) {
     console.error(err);
@@ -365,6 +386,9 @@ if (searchInput) {
             const tid = (nft.tokenid ?? nft.tokenId).toString();
             return name.includes(query) || tid.includes(query);
         });
+        // Filter edərkən də sıralama pozulmasın deyə
+        // eyni sort funksiyasını bura da tətbiq edə bilərsiniz, 
+        // amma 'allNFTs' artıq sıralandığı üçün filter qoruyacaq.
         renderNFTs(filtered);
     });
 }
@@ -468,9 +492,23 @@ async function bulkListNFTs(tokenIds, priceInEth) {
                 allNFTs[nftIndex].seller_address = seller.toLowerCase();
                 allNFTs[nftIndex].seaport_order = orderToJsonSafe(order); 
             }
-
+            
+            // Listing olandan sonra da sıranı qorumaq üçün:
             refreshSingleCard(tokenStr);
         }
+        
+        // Listing bitdikdən sonra siyahını yenidən sıralayaq ki, yeni listlər yuxarı qalxsın
+        allNFTs.sort((a, b) => {
+            const priceA = parseFloat(a.price) || 0;
+            const priceB = parseFloat(b.price) || 0;
+            const idA = parseInt(a.tokenid);
+            const idB = parseInt(b.tokenid);
+            if (priceA > 0 && priceB === 0) return -1;
+            if (priceA === 0 && priceB > 0) return 1;
+            if (priceA > 0 && priceB > 0) return priceA - priceB;
+            return idA - idB;
+        });
+        renderNFTs(allNFTs);
 
         notify("Uğurla listələndi!");
 
