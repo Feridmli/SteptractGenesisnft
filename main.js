@@ -137,12 +137,10 @@ function handleDisconnect() {
   notify("Çıxış edildi");
 }
 
-async function handleAccountsChanged(accounts) {
-  if (accounts.length === 0) {
-    handleDisconnect();
-  } else {
-    userAddress = accounts[0].toLowerCase();
-    
+// YENİ: Yalnız düymə ilə qoşulanda işə düşən funksiya
+async function setupUserSession(account) {
+    userAddress = account.toLowerCase();
+
     if (provider) {
         signer = provider.getSigner();
         seaport = new Seaport(signer, { 
@@ -159,7 +157,13 @@ async function handleAccountsChanged(accounts) {
     
     cancelBulk();
     renderNFTs(allNFTs);
-  }
+}
+
+// Metamask-da hesab dəyişəndə işə düşən listener
+async function handleAccountsChanged(accounts) {
+  // Hesab dəyişəndə avtomatik qoşulmaq əvəzinə, sessiyanı sıfırlayırıq.
+  // İstifadəçi yenidən Connect düyməsinə basmalıdır.
+  handleDisconnect();
 }
 
 async function connectWallet() {
@@ -185,7 +189,11 @@ async function connectWallet() {
     }
 
     const accounts = await provider.send("eth_requestAccounts", []);
-    await handleAccountsChanged(accounts);
+    
+    // Düyməyə basanda sessiyanı qururuq
+    if (accounts.length > 0) {
+        await setupUserSession(accounts[0]);
+    }
 
     // EIP-712 Patch for some wallets
     if (signer && !signer.signTypedData) {
@@ -200,7 +208,9 @@ async function connectWallet() {
 
   } catch (err) { 
       console.error(err);
-      alert("Connect xətası: " + err.message); 
+      if (err.code !== 4001) { // User rejected xətası deyilsə
+          alert("Connect xətası: " + err.message); 
+      }
   }
 }
 
@@ -225,7 +235,6 @@ async function fetchStats() {
 }
 
 async function loadNFTs() {
-  // Skeleton loader qalsın, amma text yazmayaq
   selectedTokens.clear();
   updateBulkUI();
   fetchStats();
