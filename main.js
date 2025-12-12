@@ -138,7 +138,6 @@ function handleDisconnect() {
 async function setupUserSession(account) {
     userAddress = account.toLowerCase();
 
-    // Provider əminlik üçün yenidən yaradılır
     if (window.ethereum) {
         provider = new ethers.providers.Web3Provider(window.ethereum, "any");
         signer = provider.getSigner();
@@ -158,7 +157,6 @@ async function setupUserSession(account) {
     renderNFTs(allNFTs);
 }
 
-// Hesab dəyişəndə avtomatik çıxış (Disconnect)
 async function handleAccountsChanged(accounts) {
   handleDisconnect();
 }
@@ -181,7 +179,6 @@ async function connectWallet() {
             blockExplorerUrls: ["https://apescan.io"],
           }],
         });
-        // Şəbəkə dəyişəndən sonra provider yenilənməlidir
         provider = new ethers.providers.Web3Provider(window.ethereum, "any");
       } catch (e) { return alert("ApeChain şəbəkəsinə keçilmədi."); }
     }
@@ -192,7 +189,6 @@ async function connectWallet() {
         await setupUserSession(accounts[0]);
     }
 
-    // EIP-712 Patch (Safe Check)
     if (signer && !signer.signTypedData) {
         signer.signTypedData = async (domain, types, value) => {
             const typesCopy = { ...types }; delete typesCopy.EIP712Domain; 
@@ -214,14 +210,9 @@ async function connectWallet() {
 disconnectBtn.onclick = handleDisconnect;
 connectBtn.onclick = connectWallet;
 
-// ==========================================
-// YENİ: Signer-i Yoxlayan və Bərpa Edən Funksiya
-// ==========================================
+// Cüzdan əlaqəsini bərpa edən funksiya
 async function ensureWalletConnection() {
-    // Əgər signer varsa, heçnə etmə
     if (signer && seaport) return true;
-
-    // Əgər signer yoxdursa, amma window.ethereum varsa, bərpa etməyə çalış
     if (window.ethereum && window.ethereum.selectedAddress) {
         console.log("Signer itmişdi, bərpa edilir...");
         try {
@@ -230,8 +221,6 @@ async function ensureWalletConnection() {
             seaport = new Seaport(signer, { 
                 overrides: { contractAddress: SEAPORT_ADDRESS, defaultConduitKey: ZERO_BYTES32 } 
             });
-            
-            // EIP-712 Patch təkrar tətbiq edilir
              if (signer && !signer.signTypedData) {
                 signer.signTypedData = async (domain, types, value) => {
                     const typesCopy = { ...types }; delete typesCopy.EIP712Domain; 
@@ -246,7 +235,6 @@ async function ensureWalletConnection() {
     }
     return false;
 }
-
 
 // ==========================================
 // 4. DATA YÜKLƏMƏ & SORTING
@@ -309,11 +297,19 @@ function createCardElement(nft) {
     let priceVal = 0;
     let isListed = false;
 
+    // Hazırkı satış qiyməti
     if (nft.price && parseFloat(nft.price) > 0) {
         priceVal = parseFloat(nft.price);
         displayPrice = `${priceVal} APE`;
         isListed = true;
     }
+
+    // --- YENİ HİSSƏ: Son satış qiyməti ---
+    let lastSoldHTML = "";
+    if (!isListed && nft.last_sale_price && parseFloat(nft.last_sale_price) > 0) {
+        lastSoldHTML = `<div style="font-size:12px; color:#888; margin-top:4px; font-weight:500;">Son satış: ${parseFloat(nft.last_sale_price).toLocaleString()} APE</div>`;
+    }
+    // ------------------------------------
 
     let canManage = false;
     let canSelect = false;
@@ -352,11 +348,15 @@ function createCardElement(nft) {
     } else {
         if (canManage) {
             actionsHTML = `
+                ${lastSoldHTML}
                 <input type="number" placeholder="Qiymət (APE)" class="mini-input price-input" step="0.001">
                 <button class="action-btn btn-list list-btn" style="margin-top:8px;">Satışa Qoy</button>
             `;
         } else {
-             actionsHTML = `<div style="font-size:13px; color:#999; text-align:center; padding:10px;">Satışda deyil</div>`;
+             actionsHTML = `
+                ${lastSoldHTML}
+                <div style="font-size:13px; color:#999; text-align:center; padding:10px;">Satışda deyil</div>
+             `;
         }
     }
 
@@ -511,7 +511,7 @@ if(bulkBuyBtn) {
 }
 
 // ==========================================
-// 8. LISTING FUNCTIONS (FIXED)
+// 8. LISTING FUNCTIONS
 // ==========================================
 
 async function listNFT(tokenid, priceInEth) {
@@ -520,9 +520,7 @@ async function listNFT(tokenid, priceInEth) {
 }
 
 async function bulkListNFTs(tokenIds, priceInEth) {
-    // YENİ: Cüzdan bağlantısını yoxlayır və lazım gələrsə bərpa edir
     await ensureWalletConnection();
-
     if (!signer || !seaport) return alert("Cüzdan qoşulmayıb! Zəhmət olmasa 'Connect Wallet' düyməsinə basın.");
     
     let priceWeiString;
@@ -602,7 +600,7 @@ async function bulkListNFTs(tokenIds, priceInEth) {
 }
 
 // ==========================================
-// 9. BUY FUNCTIONS (FIXED)
+// 9. BUY FUNCTIONS (FIXED FOR BULK)
 // ==========================================
 
 async function buyNFT(nftRecord) {
@@ -612,19 +610,20 @@ async function buyNFT(nftRecord) {
 }
 
 async function bulkBuyNFTs(tokenIds) {
-    // YENİ: Cüzdan bağlantısını yoxlayır və lazım gələrsə bərpa edir
+    // 1. Cüzdanı yoxla
     await ensureWalletConnection();
-
     if (!signer || !seaport) return alert("Cüzdan qoşulmayıb! Zəhmət olmasa 'Connect Wallet' düyməsinə basın.");
     
     const buyerAddress = await signer.getAddress();
     const fulfillOrderDetails = [];
-    let totalValue = ethers.BigNumber.from(0);
 
+    // 2. Orderləri hazırla
     for (const tid of tokenIds) {
         const nftRecord = allNFTs.find(n => n.tokenid == tid);
+        // Order yoxdursa keç
         if (!nftRecord || !nftRecord.seaport_order) continue;
 
+        // Öz malını ala bilməzsən
         if (nftRecord.seller_address && nftRecord.seller_address.toLowerCase() === buyerAddress.toLowerCase()) {
             return alert(`NFT #${tid} sizin özünüzə aiddir, onu ala bilməzsiniz!`);
         }
@@ -635,9 +634,6 @@ async function bulkBuyNFTs(tokenIds) {
         const cleanOrd = cleanOrder(rawOrder);
         if (cleanOrd) {
             fulfillOrderDetails.push({ order: cleanOrd });
-            cleanOrd.parameters.consideration.forEach(c => {
-                 if (Number(c.itemType) === 0) totalValue = totalValue.add(ethers.BigNumber.from(c.startAmount));
-            });
         }
     }
 
@@ -646,6 +642,7 @@ async function bulkBuyNFTs(tokenIds) {
     notify(`${fulfillOrderDetails.length} NFT üçün toplu alış hazırlanır...`);
 
     try {
+        // 3. Seaport vasitəsilə tranzaksiyanın qurulması (fulfillOrders)
         const { actions } = await seaport.fulfillOrders({
             fulfillOrderDetails: fulfillOrderDetails,
             accountAddress: buyerAddress,
@@ -654,15 +651,36 @@ async function bulkBuyNFTs(tokenIds) {
 
         const txRequest = await actions[0].transactionMethods.buildTransaction();
 
-        if (txRequest.value) {
-            const valBN = ethers.BigNumber.from(txRequest.value);
-            if (valBN.gt(totalValue)) totalValue = valBN;
+        // 4. Value və Gas-ın dəqiq təyin edilməsi
+        // Əl ilə toplamaq əvəzinə, Seaport-un hesabladığı dəyəri götürürük
+        const finalValue = txRequest.value ? ethers.BigNumber.from(txRequest.value) : ethers.BigNumber.from(0);
+
+        notify("Qaz limiti hesablanır...");
+
+        let estimatedGas;
+        try {
+            // Blokçeyndən bu əməliyyat üçün dəqiq qaz miqdarını soruşuruq
+            estimatedGas = await signer.estimateGas({
+                to: txRequest.to,
+                data: txRequest.data,
+                value: finalValue
+            });
+            // Xəta olmasın deyə üzərinə 20% ehtiyat gəlirik
+            estimatedGas = estimatedGas.mul(120).div(100); 
+        } catch (gasError) {
+            console.error("Gas Estimate Error:", gasError);
+            // Əgər estimate alınmasa, fallback (hər item üçün 300k)
+            estimatedGas = ethers.BigNumber.from(300000).mul(fulfillOrderDetails.length);
         }
 
         notify("Metamask-da təsdiqləyin...");
+        
+        // 5. Tranzaksiyanın göndərilməsi
         const tx = await signer.sendTransaction({
-            to: txRequest.to, data: txRequest.data, value: totalValue, 
-            gasLimit: 300000 * fulfillOrderDetails.length 
+            to: txRequest.to, 
+            data: txRequest.data, 
+            value: finalValue, 
+            gasLimit: estimatedGas 
         });
 
         notify("Blokçeyndə təsdiqlənir...");
@@ -670,6 +688,7 @@ async function bulkBuyNFTs(tokenIds) {
 
         notify("Baza yenilənir...");
         
+        // 6. Uğurlu olduqdan sonra lokal yenilənmə (Last Sale Logic)
         for (const item of fulfillOrderDetails) {
             const tokenIdentifier = item.order.parameters.offer[0].identifierOrCriteria;
             const nftData = allNFTs.find(n => n.tokenid == tokenIdentifier);
@@ -688,6 +707,9 @@ async function bulkBuyNFTs(tokenIds) {
                 
                 const idx = allNFTs.findIndex(n => n.tokenid == tokenIdentifier);
                 if (idx !== -1) {
+                    // --- YENİ: Son satış qiymətini yadda saxla ---
+                    allNFTs[idx].last_sale_price = allNFTs[idx].price;
+                    // ---------------------------------------------
                     allNFTs[idx].price = 0;
                     allNFTs[idx].seller_address = null;
                     allNFTs[idx].buyer_address = buyerAddress.toLowerCase();
@@ -703,8 +725,15 @@ async function bulkBuyNFTs(tokenIds) {
 
     } catch (err) {
         console.error("Bulk Buy Error:", err);
-        if (err.message && err.message.includes("insufficient funds")) alert("Balansınızda kifayət qədər APE yoxdur.");
-        else alert("Alış xətası: " + (err.message || err));
+        if (err.message && (err.message.includes("insufficient funds") || err.code === "INSUFFICIENT_FUNDS")) {
+             alert("Balansınızda kifayət qədər APE yoxdur (Qiymət + Gas).");
+        } 
+        else if (err.data && err.data.message && err.data.message.includes("execution reverted")) {
+             alert("Xəta: Seçdiyiniz NFT-lərdən biri artıq satılıb və ya qiyməti dəyişib.");
+        }
+        else {
+             alert("Alış xətası: " + (err.message || err));
+        }
     }
 }
 
