@@ -22,55 +22,47 @@ app.use(express.json({ limit: "10mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "dist");
+
+// 1. Statik fayllar (Frontend)
 app.use(express.static(distPath));
+
+// 2. Rarity Data üçün xüsusi yol (Ehtiyat üçün)
+app.use('/rarity_data.json', express.static(path.join(distPath, 'rarity_data.json')));
 
 // =============================================
 // API ROUTES
 // =============================================
 
-// 1. STATISTIKA API
+// Stats API
 app.get("/api/stats", async (req, res) => {
     try {
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: allSales, error } = await supabase
-            .from("orders")
-            .select("price, createdat");
-
+        const { data: allSales, error } = await supabase.from("orders").select("price, createdat");
         if (error) throw error;
 
         let totalVolume = 0;
         let dayVolume = 0;
-
         allSales.forEach(sale => {
             const p = parseFloat(sale.price || 0);
             totalVolume += p;
-            if (sale.createdat > oneDayAgo) {
-                dayVolume += p;
-            }
+            if (sale.createdat > oneDayAgo) dayVolume += p;
         });
-
         res.json({ success: true, totalVolume, dayVolume });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// 2. NFT List
+// NFT List API
 app.get("/api/nfts", async (req, res) => {
-  const { data, error } = await supabase
-    .from("metadata")
-    .select("*") // Bu last_sale_price sütununu da gətirəcək
-    .order("tokenid", { ascending: true });
+  const { data, error } = await supabase.from("metadata").select("*").order("tokenid", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ nfts: data });
 });
 
-// 3. Create Order
+// Create Order API
 app.post("/api/order", async (req, res) => {
   const { tokenid, price, seller_address, seaport_order, order_hash } = req.body;
   if (!tokenid || !seaport_order) return res.status(400).json({ error: "Missing data" });
 
-  // Listələmə zamanı last_sale_price dəyişmir, sadəcə yeni qiymət qoyulur
   const { error } = await supabase.from("metadata").upsert({
     tokenid: tokenid.toString(),
     price: price,
@@ -88,17 +80,16 @@ app.post("/api/order", async (req, res) => {
   res.json({ success: true });
 });
 
-// 4. BUY COMPLETE (YENİLƏNDİ - last_sale_price LOGIC)
+// Buy API
 app.post("/api/buy", async (req, res) => {
   const { tokenid, buyer_address, price, seller } = req.body;
   if (!tokenid || !buyer_address) return res.status(400).json({ error: "Missing buying data" });
 
-  // A. Metadata-nı yeniləyirik
   const { error: metaError } = await supabase.from("metadata").update({
     buyer_address: buyer_address.toLowerCase(),
     seller_address: null, 
-    price: 0,                   // Satışdan çıxarılır
-    last_sale_price: price,     // <--- YENİ: Satış qiyməti tarixçəyə yazılır
+    price: 0,                   
+    last_sale_price: price,     
     seaport_order: null,
     order_hash: null,
     on_chain: true,
@@ -107,7 +98,6 @@ app.post("/api/buy", async (req, res) => {
 
   if (metaError) return res.status(500).json({ error: metaError.message });
 
-  // B. Orders cədvəlinə tarixçə yazırıq
   if (price && parseFloat(price) > 0) {
       await supabase.from("orders").insert({
           tokenid: tokenid.toString(),
@@ -117,7 +107,6 @@ app.post("/api/buy", async (req, res) => {
           status: 'completed'
       });
   }
-
   res.json({ success: true });
 });
 
