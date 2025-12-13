@@ -1,11 +1,11 @@
-const fs = require('fs');
-const axios = require('axios');
+import fs from 'fs';
+import axios from 'axios';
 
 // ==========================================
 // KONFİQURASİYA
 // ==========================================
 const CID = "QmawxnmmzngbiYe1PSgc9YEthFX11uiTtT6YPdUdLD3x3E";
-const TOTAL_SUPPLY = 2200;
+const TOTAL_SUPPLY = 2200; // Cəmi 2222 NFT olmalıdır
 
 // GitHub Actions sürətli internetə malik olduğu üçün 'dweb.link' və ya 'ipfs.io' istifadə edə bilərik.
 const GATEWAY = "https://dweb.link/ipfs/"; 
@@ -73,7 +73,6 @@ async function generateRarity() {
             const percentDisplay = (percentRaw * 100).toFixed(1) + "%";
             
             // Score düsturu: 1 bölünsün faiz (Nadir olanın balı çox olur)
-            // Məsələn: 1% nadirlik = 1 / 0.01 = 100 xal
             const score = 1 / percentRaw;
             
             totalScore += score;
