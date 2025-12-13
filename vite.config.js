@@ -3,6 +3,8 @@ import path from "path";
 
 export default defineConfig({
   root: ".",
+  // publicDir 'public' qovluğunu avtomatik dist-ə kopyalayır (rarity json üçün)
+  publicDir: "public",
   resolve: {
     alias: {
       buffer: "buffer",
