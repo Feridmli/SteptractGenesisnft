@@ -11,10 +11,10 @@ import { Seaport } from "@opensea/seaport-js";
 const ItemType = { NATIVE: 0, ERC20: 1, ERC721: 2, ERC1155: 3 };
 const OrderType = { FULL_OPEN: 0, PARTIAL_OPEN: 1, FULL_RESTRICTED: 2, PARTIAL_RESTRICTED: 3 };
 
-// Env Variables (Yoxdursa default dəyərlər istifadə olunur)
+// Env Variables
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; 
 const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xf62049dd99d8a1fa57a31ce091282b2628acc301"; 
-const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395"; // Seaport 1.5
+const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395"; 
 const APECHAIN_RPC = import.meta.env.VITE_APECHAIN_RPC || "https://rpc.apechain.com";
 
 const ZERO_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -27,7 +27,7 @@ let provider = null;
 let signer = null;
 let seaport = null;
 let userAddress = null;
-let apePriceUsd = 0; // APE-in dollar qarşılığı
+let apePriceUsd = 0; // 1 APE neçə dollardır?
 
 let selectedTokens = new Set();
 let allNFTs = []; 
@@ -47,6 +47,9 @@ const bulkListBtn = document.getElementById("bulkListBtn");
 const bulkListActions = document.getElementById("bulkListActions");
 const bulkBuyBtn = document.getElementById("bulkBuyBtn");
 const bulkTotalPriceEl = document.getElementById("bulkTotalPrice");
+
+// Düzəliş: Bulk input placeholder-i dəyişirik
+if(bulkPriceInp) bulkPriceInp.placeholder = "Qiymət ($)";
 
 const searchInput = document.getElementById("searchInput");
 const totalVolEl = document.getElementById("totalVol");
@@ -72,7 +75,7 @@ function notify(msg, timeout = 4000) {
   }
 }
 
-// APE qiymətini CoinGecko-dan çəkir
+// APE qiymətini çəkir (Vacibdir: bu olmadan dollar hesablaya bilmərik)
 async function fetchApePrice() {
     try {
         const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=apecoin&vs_currencies=usd');
@@ -82,7 +85,7 @@ async function fetchApePrice() {
             console.log("Current APE Price: $" + apePriceUsd);
         }
     } catch (error) {
-        console.warn("APE qiyməti alına bilmədi (API limiti ola bilər), USD göstərilməyəcək.");
+        console.warn("APE qiyməti alına bilmədi, default olaraq 1 götürülə bilər amma dollar hesabı səhv olar.");
     }
 }
 
@@ -131,7 +134,7 @@ function orderToJsonSafe(obj) {
 }
 
 // ==========================================
-// 3. CÜZDAN QOŞULMASI (WALLET CONNECT)
+// 3. CÜZDAN QOŞULMASI
 // ==========================================
 
 function handleDisconnect() {
@@ -271,7 +274,7 @@ async function loadNFTs() {
   updateBulkUI();
   fetchStats();
   
-  // Əvvəlcə dollar qiymətini çəkirik
+  // Öncə APE qiymətini çəkirik
   await fetchApePrice();
 
   try {
@@ -299,7 +302,7 @@ async function loadNFTs() {
 }
 
 // ==========================================
-// 5. RENDER & HTML GENERATION (USD İLƏ)
+// 5. RENDER (INPUTLAR DOLLAR OLAÇAQ)
 // ==========================================
 
 function createCardElement(nft) {
@@ -313,12 +316,11 @@ function createCardElement(nft) {
     let priceVal = 0;
     let isListed = false;
 
-    // Hazırkı satış qiyməti və Dollar hesabı
+    // Listələnmiş NFT-lər üçün görüntü
     if (nft.price && parseFloat(nft.price) > 0) {
         priceVal = parseFloat(nft.price);
         isListed = true;
         
-        // Dollar Formatı
         let usdText = "";
         if (apePriceUsd > 0) {
             const totalUsd = (priceVal * apePriceUsd).toFixed(2);
@@ -327,7 +329,7 @@ function createCardElement(nft) {
         displayPrice = `${priceVal} APE ${usdText}`;
     }
 
-    // Son satış qiyməti və Dollar hesabı
+    // Son satış tarixi
     let lastSoldHTML = "";
     if (!isListed && nft.last_sale_price && parseFloat(nft.last_sale_price) > 0) {
         const lsPrice = parseFloat(nft.last_sale_price);
@@ -364,22 +366,22 @@ function createCardElement(nft) {
     let actionsHTML = "";
     if (isListed) {
         if (canManage) {
+            // YENİLİK: Input placeholder "Qiymət ($)" oldu
             actionsHTML = `
                 <div style="font-size:13px; color:#10b981; margin-bottom:5px; font-weight:600;">Sizin Listiniz: ${displayPrice}</div>
-                <input type="number" placeholder="Yeni Qiymət" class="mini-input price-input" step="0.001">
+                <input type="number" placeholder="Yeni Qiymət ($)" class="mini-input price-input" step="0.01">
                 <button class="action-btn btn-list update-btn" style="margin-top:8px;">Yenilə</button>
             `;
         } else {
-            // displayPrice artıq HTML tagları ehtiva etdiyi üçün birbaşa düyməyə qoymuruq
-            // Düymə üçün sadə mətn versiyasını düzəldirik
             let btnText = `${priceVal} APE`; 
             actionsHTML = `<button class="action-btn btn-buy buy-btn">Satın Al ${btnText}</button> <div style="text-align:center; font-size:11px; color:#666; margin-top:2px;">${apePriceUsd > 0 ? `~$${(priceVal * apePriceUsd).toFixed(2)}` : ''}</div>`;
         }
     } else {
         if (canManage) {
+            // YENİLİK: Input placeholder "Qiymət ($)" oldu
             actionsHTML = `
                 ${lastSoldHTML}
-                <input type="number" placeholder="Qiymət (APE)" class="mini-input price-input" step="0.001">
+                <input type="number" placeholder="Qiymət ($)" class="mini-input price-input" step="0.01">
                 <button class="action-btn btn-list list-btn" style="margin-top:8px;">Satışa Qoy</button>
             `;
         } else {
@@ -417,14 +419,34 @@ function createCardElement(nft) {
         const btn = card.querySelector(".buy-btn");
         if(btn) btn.onclick = async () => await buyNFT(nft);
     } else {
+        // --- SATIŞ DÜYMƏSİ MƏNTİQİ (DOLLAR ÇEVİRMƏ) ---
         const btn = card.querySelector(".list-btn") || card.querySelector(".update-btn");
-        if(btn) btn.onclick = async () => {
-            const priceInput = card.querySelector(".price-input");
-            let inp = priceInput.value;
-            if(inp) inp = inp.trim();
-            if(!inp || isNaN(inp) || parseFloat(inp) <= 0) return notify("Düzgün qiymət yazın!");
-            await listNFT(tokenid, inp);
-        };
+        if(btn) {
+            btn.onclick = async () => {
+                const priceInput = card.querySelector(".price-input");
+                let usdInp = priceInput.value;
+                if(usdInp) usdInp = usdInp.trim();
+
+                // Validation
+                if(!usdInp || isNaN(usdInp) || parseFloat(usdInp) <= 0) return notify("Düzgün dollar qiyməti yazın!");
+                
+                // Məzənnə yoxdursa xəta
+                if (!apePriceUsd || apePriceUsd <= 0) {
+                    await fetchApePrice(); // təkrar cəhd
+                    if (!apePriceUsd || apePriceUsd <= 0) return alert("APE məzənnəsi alınmadı. Zəhmət olmasa səhifəni yeniləyin.");
+                }
+
+                // Çevirmə: USD / ApePrice = APE Miqdarı
+                const apeAmount = parseFloat(usdInp) / apePriceUsd;
+                
+                // İstifadəçidən təsdiq
+                const confirmMsg = `Siz bu NFT-ni $${usdInp} qiymətinə qoyursunuz.\nBu təxminən ${apeAmount.toFixed(4)} APE edir.\nDavam edilsin?`;
+                if (!confirm(confirmMsg)) return;
+
+                // Listələmə funksiyasına artıq APE göndəririk
+                await listNFT(tokenid, apeAmount);
+            };
+        }
     }
 
     return card;
@@ -479,7 +501,7 @@ if (searchInput) {
 }
 
 // ==========================================
-// 7. TOPLU UI & LOGIC (USD DƏSTƏYİ)
+// 7. TOPLU UI & LOGIC
 // ==========================================
 
 function updateBulkUI() {
@@ -487,7 +509,7 @@ function updateBulkUI() {
         bulkBar.classList.add("active");
         bulkCount.textContent = `${selectedTokens.size} NFT seçildi`;
 
-        let totalCost = 0;
+        let totalCostApe = 0;
         let allListed = true;
         let validSelection = false;
 
@@ -499,24 +521,24 @@ function updateBulkUI() {
                 const isOwner = (nft.seller_address && nft.seller_address.toLowerCase() === userAddress);
                 
                 if (price > 0 && !isOwner) {
-                    totalCost += price;
+                    totalCostApe += price;
                 } else {
                     allListed = false; 
                 }
             }
         });
 
-        if (allListed && validSelection && totalCost > 0) {
+        if (allListed && validSelection && totalCostApe > 0) {
             bulkListActions.style.display = "none";
             bulkBuyBtn.style.display = "inline-block";
             
-            // USD Hesablama
+            // USD Hesablama (Display)
             let totalUsdText = "";
             if (apePriceUsd > 0) {
-                totalUsdText = ` ($${(totalCost * apePriceUsd).toFixed(2)})`;
+                totalUsdText = ` ($${(totalCostApe * apePriceUsd).toFixed(2)})`;
             }
 
-            bulkTotalPriceEl.innerHTML = `${totalCost.toFixed(3)} ${totalUsdText}`;
+            bulkTotalPriceEl.innerHTML = `${totalCostApe.toFixed(3)} ${totalUsdText}`;
         } else {
             bulkListActions.style.display = "flex";
             bulkBuyBtn.style.display = "none";
@@ -532,12 +554,26 @@ window.cancelBulk = () => {
     updateBulkUI();
 };
 
+// --- BULK LISTING (DOLLAR ÇEVİRMƏ) ---
 if(bulkListBtn) {
     bulkListBtn.onclick = async () => {
-        let priceVal = bulkPriceInp.value;
-        if(priceVal) priceVal = priceVal.trim();
-        if (!priceVal || isNaN(priceVal) || parseFloat(priceVal) <= 0) return alert("Qiymət yazın.");
-        await bulkListNFTs(Array.from(selectedTokens), priceVal);
+        let usdVal = bulkPriceInp.value;
+        if(usdVal) usdVal = usdVal.trim();
+        
+        if (!usdVal || isNaN(usdVal) || parseFloat(usdVal) <= 0) return alert("Dollar qiyməti yazın.");
+        
+        if (!apePriceUsd || apePriceUsd <= 0) {
+             await fetchApePrice();
+             if (!apePriceUsd || apePriceUsd <= 0) return alert("Məzənnə xətası. Yeniləyin.");
+        }
+
+        // Çevirmə: USD -> APE
+        const apeAmount = parseFloat(usdVal) / apePriceUsd;
+
+        const confirmMsg = `Siz seçilən NFT-ləri hər biri $${usdVal} (~${apeAmount.toFixed(4)} APE) qiymətinə qoyursunuz.\nDavam?`;
+        if(!confirm(confirmMsg)) return;
+
+        await bulkListNFTs(Array.from(selectedTokens), apeAmount);
     };
 }
 
@@ -548,21 +584,26 @@ if(bulkBuyBtn) {
 }
 
 // ==========================================
-// 8. LISTING FUNCTIONS
+// 8. LISTING FUNCTIONS (Bura artıq APE gəlir)
 // ==========================================
 
-async function listNFT(tokenid, priceInEth) {
+// Bu funksiya artıq çevrilmiş APE miqdarını qəbul edir
+async function listNFT(tokenid, priceInApe) {
   if (tokenid === undefined || tokenid === null) return alert("Token ID xətası.");
-  await bulkListNFTs([tokenid], priceInEth);
+  await bulkListNFTs([tokenid], priceInApe);
 }
 
-async function bulkListNFTs(tokenIds, priceInEth) {
+async function bulkListNFTs(tokenIds, priceInApe) {
     await ensureWalletConnection();
     if (!signer || !seaport) return alert("Cüzdan qoşulmayıb! Zəhmət olmasa 'Connect Wallet' düyməsinə basın.");
     
+    // QİYMƏT FORMATI (APE -> WEI)
     let priceWeiString;
     try {
-        priceWeiString = ethers.utils.parseEther(String(priceInEth).trim()).toString();
+        // priceInApe artıq rəqəmdir (məsələn 8.33333)
+        // Ethers.js çox uzun onluq kəsrləri sevmir, ona görə 18 rəqəmə qədər kəsib string edirik
+        const safePriceStr = priceInApe.toFixed(18); 
+        priceWeiString = ethers.utils.parseEther(safePriceStr).toString();
     } catch (e) { return alert(`Qiymət xətası: ${e.message}`); }
 
     const cleanTokenIds = tokenIds.map(t => String(t));
@@ -605,11 +646,12 @@ async function bulkListNFTs(tokenIds, priceInEth) {
             const offerItem = order.parameters.offer[0];
             const tokenStr = offerItem.identifierOrCriteria;
 
+            // Baza'ya da APE olaraq yazırıq (priceInApe)
             await fetch(`${BACKEND_URL}/api/order`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     tokenid: tokenStr,
-                    price: String(priceInEth),
+                    price: String(priceInApe), // Bazaya APE miqdarı gedir
                     seller_address: seller,
                     seaport_order: orderToJsonSafe(order),
                     order_hash: seaport.getOrderHash(order.parameters),
@@ -619,7 +661,7 @@ async function bulkListNFTs(tokenIds, priceInEth) {
 
             const nftIndex = allNFTs.findIndex(n => n.tokenid == tokenStr);
             if (nftIndex !== -1) {
-                allNFTs[nftIndex].price = priceInEth;
+                allNFTs[nftIndex].price = priceInApe;
                 allNFTs[nftIndex].seller_address = seller.toLowerCase();
                 allNFTs[nftIndex].seaport_order = orderToJsonSafe(order); 
                 allNFTs[nftIndex].buyer_address = null;
