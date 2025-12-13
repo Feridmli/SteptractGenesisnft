@@ -31,6 +31,7 @@ let apePriceUsd = 0; // 1 APE = ? USD
 
 let selectedTokens = new Set();
 let allNFTs = []; 
+let rarityData = {}; // Rarity dataları burada saxlanacaq
 let currentFilter = 'all'; // Default filtr: hamısı
 
 // UI Elements
@@ -55,7 +56,7 @@ const bulkListActions = document.getElementById("bulkListActions");
 const bulkBuyBtn = document.getElementById("bulkBuyBtn");
 const bulkTotalPriceEl = document.getElementById("bulkTotalPrice");
 
-// Input placeholder-i Dollar edirik
+// Input placeholder-i Dollar edirik (Düzəliş)
 if(bulkPriceInp) bulkPriceInp.placeholder = "Qiymət ($)";
 
 const searchInput = document.getElementById("searchInput");
@@ -329,7 +330,7 @@ async function ensureWalletConnection() {
 }
 
 // ==========================================
-// 5. DATA YÜKLƏMƏ
+// 5. DATA YÜKLƏMƏ (RARITY & STATS)
 // ==========================================
 
 async function fetchStats() {
@@ -345,13 +346,27 @@ async function fetchStats() {
     } catch(e) { console.error("Stats Error:", e); }
 }
 
-async function loadNFTs() {
+async function loadData() {
   selectedTokens.clear();
   updateBulkUI();
   fetchStats();
   
   await fetchApePrice();
 
+  // 1. Rarity Datanı Yüklə (Github Action tərəfindən yaradılan json)
+  try {
+      const rRes = await fetch('/rarity_data.json');
+      if (rRes.ok) {
+          rarityData = await rRes.json();
+          console.log("✅ Rarity Data Loaded.");
+      } else {
+          console.warn("⚠️ rarity_data.json tapılmadı.");
+      }
+  } catch(e) {
+      console.error("Rarity Load Error:", e);
+  }
+
+  // 2. NFT-ləri Bazadan Çək
   try {
     const res = await fetch(`${BACKEND_URL}/api/nfts`);
     const data = await res.json();
@@ -379,7 +394,7 @@ async function loadNFTs() {
 }
 
 // ==========================================
-// 6. RENDER (INPUTLAR DOLLAR)
+// 6. RENDER (INPUTLAR DOLLAR & RARITY)
 // ==========================================
 
 function createCardElement(nft) {
@@ -431,8 +446,44 @@ function createCardElement(nft) {
         }
     }
 
+    // --- RARITY INFO ---
+    // rarityData-dan məlumatı çəkirik, yoxdursa 'common' kimi davranır
+    const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
+    
+    // İkonlar
+    const icons = { mythic:'🛑', legendary:'✴️', epic:'☸️', rare:'Ⓜ️', common:'🆖' };
+    const icon = icons[rInfo.type] || '🎲';
+    const rankLabel = rInfo.rank !== '?' ? `Rank #${rInfo.rank}` : `#${tokenid}`;
+
+    // Traits HTML Hazırlanması (Top 4 ən nadir)
+    let attrHTML = "";
+    if (rInfo.traits && rInfo.traits.length > 0) {
+        // Skora görə sırala (böyükdən kiçiyə)
+        const sortedTraits = rInfo.traits.sort((a,b) => b.score - a.score).slice(0, 4);
+        
+        attrHTML = `<div class="attributes-grid">`;
+        sortedTraits.forEach(t => {
+            // Nadirlik rəngi (faizə görə)
+            const pctVal = parseFloat(t.percent);
+            let pctColor = "#64748b"; // boz
+            if(pctVal < 1) pctColor = "#ef4444"; // qırmızı (<1%)
+            else if(pctVal < 5) pctColor = "#f59e0b"; // narıncı (<5%)
+
+            attrHTML += `
+                <div class="trait-box">
+                    <div class="trait-type">${t.trait_type}</div>
+                    <div class="trait-value" title="${t.value}">${t.value}</div>
+                    <div style="font-size:9px; color:${pctColor}; text-align:right;">${t.percent}</div>
+                </div>
+            `;
+        });
+        attrHTML += `</div>`;
+    } else {
+        attrHTML = `<div style="height:40px; display:flex; align-items:center; justify-content:center; color:#ccc; font-size:10px;">-</div>`;
+    }
+
     const card = document.createElement("div");
-    card.className = "nft-card";
+    card.className = `nft-card ${rInfo.type}`; // CSS class: mythic, rare və s.
     card.id = `card-${tokenid}`; 
     card.style.height = "auto";
 
@@ -442,13 +493,12 @@ function createCardElement(nft) {
     if (isListed) {
         if (canManage) {
             actionsHTML = `
-                <div style="font-size:13px; color:#10b981; margin-bottom:5px; font-weight:600;">Sizin Listiniz: ${displayPrice}</div>
                 <input type="number" placeholder="Yeni Qiymət ($)" class="mini-input price-input" step="0.01">
                 <button class="action-btn btn-list update-btn" style="margin-top:8px;">Yenilə</button>
             `;
         } else {
             let btnText = `${priceVal.toFixed(2)} APE`; 
-            actionsHTML = `<button class="action-btn btn-buy buy-btn">Satın Al ${btnText}</button> <div style="text-align:center; font-size:11px; color:#666; margin-top:2px;">${apePriceUsd > 0 ? `~$${(priceVal * apePriceUsd).toFixed(2)}` : ''}</div>`;
+            actionsHTML = `<button class="action-btn btn-buy buy-btn">Satın Al ${btnText}</button>`;
         }
     } else {
         if (canManage) {
@@ -466,12 +516,19 @@ function createCardElement(nft) {
     }
 
     card.innerHTML = `
+        <div class="rarity-badge ${rInfo.type}">
+            <i>${icon}</i> <span>${rankLabel}</span>
+        </div>
         ${checkboxHTML}
         <div class="card-content">
             <div class="card-title" title="${name}">${name}</div>
-            <div class="card-details">
-                 ${displayPrice && !canManage ? `<div class="price-val" style="display:flex; align-items:center; flex-wrap:wrap;">${displayPrice}</div>` : `<div style="height:24px"></div>`}
+            
+            ${attrHTML}
+
+            <div style="margin-top:auto; padding-top:5px;">
+                 ${displayPrice && !canManage ? `<div class="price-val" style="display:flex; align-items:center; flex-wrap:wrap;">${displayPrice}</div>` : ``}
             </div>
+            
             <div class="card-actions" style="flex-direction:column; gap:4px;">
                 ${actionsHTML}
             </div>
@@ -868,5 +925,5 @@ async function bulkBuyNFTs(tokenIds) {
 }
 
 // Initial Load
-loadNFTs();
-window.loadNFTs = loadNFTs;
+loadData();
+window.loadNFTs = loadData; // Alias for console debugging
