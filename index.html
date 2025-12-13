@@ -24,6 +24,13 @@
       --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       --glass-bg: rgba(255, 255, 255, 0.85);
       --glass-border: rgba(255, 255, 255, 0.5);
+
+      /* RARITY COLORS (MoonRank Style) */
+      --mythic-color: #ef4444;    /* Rank 1-22 (Qırmızı) */
+      --legend-color: #f59e0b;    /* Rank 23-132 (Qızılı) */
+      --epic-color: #a855f7;      /* Rank 133-462 (Bənövşəyi) */
+      --rare-color: #3b82f6;      /* Rank 463-1122 (Mavi) */
+      --common-color: #94a3b8;    /* Rank 1123+ (Boz) */
     }
 
     body {
@@ -161,14 +168,14 @@
     .stat-value { font-size: 26px; font-weight: 800; color: var(--text-primary); }
 
     /* =========================================
-       NEW: FILTER TABS CSS
+       FILTER TABS CSS
        ========================================= */
     .filter-container {
         display: flex;
         gap: 12px;
         margin-bottom: 25px;
         overflow-x: auto;
-        padding-bottom: 5px; /* Scroll bar mobile fix */
+        padding-bottom: 5px;
         -webkit-overflow-scrolling: touch;
     }
     
@@ -258,7 +265,7 @@
     }
 
     /* =========================================
-       NFT CARD DESIGN
+       NFT CARD DESIGN & RARITY
        ========================================= */
     .nft-card {
       background-color: var(--card-bg);
@@ -272,7 +279,6 @@
       border: 1px solid transparent;
       transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       min-height: 140px;
-      
       opacity: 0;
       animation: fadeInUp 0.6s ease forwards;
     }
@@ -280,8 +286,30 @@
     .nft-card:hover {
       transform: translateY(-8px) scale(1.02);
       box-shadow: var(--shadow-hover);
-      border-color: rgba(59, 130, 246, 0.2);
     }
+
+    /* Rarity Border Colors */
+    .nft-card.mythic { border: 1px solid var(--mythic-color); box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15); }
+    .nft-card.legendary { border: 1px solid var(--legend-color); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15); }
+    .nft-card.epic { border: 1px solid var(--epic-color); }
+    .nft-card.rare { border: 1px solid var(--rare-color); }
+    .nft-card.common { border: 1px solid var(--border-color); }
+
+    /* Rarity Badge */
+    .rarity-badge {
+        position: absolute; top: 10px; left: 10px;
+        padding: 4px 10px; border-radius: 8px;
+        font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+        color: white; z-index: 5;
+        display: flex; align-items: center; gap: 5px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .rarity-badge.mythic { background: linear-gradient(135deg, #ef4444, #b91c1c); border: 1px solid #fca5a5; }
+    .rarity-badge.legendary { background: linear-gradient(135deg, #f59e0b, #d97706); border: 1px solid #fcd34d; }
+    .rarity-badge.epic { background: linear-gradient(135deg, #a855f7, #7e22ce); border: 1px solid #d8b4fe; }
+    .rarity-badge.rare { background: linear-gradient(135deg, #3b82f6, #2563eb); border: 1px solid #93c5fd; }
+    .rarity-badge.common { background: rgba(148, 163, 184, 0.9); color: #f1f5f9; }
 
     .card-content {
       padding: 24px;
@@ -289,7 +317,6 @@
       flex-direction: column;
       gap: 12px;
       flex-grow: 1;
-      justify-content: center;
     }
 
     .card-title {
@@ -297,17 +324,41 @@
       font-size: 18px;
       color: var(--text-primary);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 15px; /* Badge üçün yer */
     }
 
-    .card-details {
-      min-height: 32px; display: flex; align-items: center;
+    /* Attributes Grid */
+    .attributes-grid {
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 6px; 
+        margin-top: 5px;
     }
+    .trait-box {
+        background: #f8fafc; 
+        border: 1px solid #e2e8f0;
+        border-radius: 6px; 
+        padding: 6px 8px;
+        font-size: 10px; 
+        display: flex; 
+        flex-direction: column;
+    }
+    .trait-type { 
+        color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 9px; margin-bottom: 2px;
+    }
+    .trait-value { 
+        color: #334155; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    
+    .nft-card.mythic .trait-box { background: #fff1f2; border-color: #fecaca; }
 
     .price-val {
       font-size: 16px; font-weight: 700;
       background: rgba(59, 130, 246, 0.08); 
       color: var(--accent-color);
       padding: 6px 12px; border-radius: 8px;
+      display: inline-block;
+      margin-top: auto;
     }
 
     /* Action Inputs & Buttons */
@@ -346,11 +397,10 @@
 
     /* CHECKBOX */
     .select-box {
-      position: absolute; top: 16px; right: 16px; width: 24px; height: 24px;
+      position: absolute; top: 12px; right: 12px; width: 24px; height: 24px;
       cursor: pointer; appearance: none;
       background: rgba(255,255,255,0.9); border: 2px solid #cbd5e1; border-radius: 8px;
-      transition: all 0.2s cubic-bezier(0.5, 1.6, 0.4, 0.7); 
-      z-index: 10; opacity: 0; transform: scale(0.5);
+      transition: all 0.2s; z-index: 10; opacity: 0; transform: scale(0.5);
     }
     .nft-card:hover .select-box, .select-box:checked { opacity: 1; transform: scale(1); }
     .select-box:checked {
@@ -399,7 +449,7 @@
       background: linear-gradient(90deg, #f0f2f5 25%, #e6e8eb 50%, #f0f2f5 75%);
       background-size: 200% 100%;
       animation: loading 1.5s infinite;
-      border-radius: var(--card-radius); height: 160px; border: none;
+      border-radius: var(--card-radius); height: 260px; border: none;
     }
     @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
@@ -492,7 +542,7 @@
     <div style="display:flex; gap:12px; align-items:center; width: 100%; justify-content: flex-end;">
         
         <div id="bulkListActions" style="display:flex; gap:12px; align-items:center;">
-            <input type="number" id="bulkPrice" placeholder="Qiymət (APE)" class="bulk-input" step="0.001">
+            <input type="number" id="bulkPrice" placeholder="Qiymət ($)" class="bulk-input" step="0.01">
             <button class="wallet-btn" id="bulkListBtn" style="padding: 12px 30px; box-shadow: none;">Listələ</button>
         </div>
 
