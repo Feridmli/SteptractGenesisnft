@@ -1,0 +1,34 @@
+name: Generate Rarity Data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies
+      run: npm install axios
+
+    - name: Run Calculation Script
+      run: node calculate_rarity.js
+
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        git add public/rarity_data.json
+        git commit -m "Auto-generated rarity data [skip ci]" || echo "No changes"
+        git push origin main
