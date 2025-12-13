@@ -5,7 +5,7 @@ const axios = require('axios');
 // KONFİQURASİYA
 // ==========================================
 const CID = "QmawxnmmzngbiYe1PSgc9YEthFX11uiTtT6YPdUdLD3x3E";
-const TOTAL_SUPPLY = 2222;
+const TOTAL_SUPPLY = 2200;
 
 // GitHub Actions sürətli internetə malik olduğu üçün 'dweb.link' və ya 'ipfs.io' istifadə edə bilərik.
 const GATEWAY = "https://dweb.link/ipfs/"; 
